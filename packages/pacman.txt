@@ -9,11 +9,18 @@ libnewt
 # ─── Bar (Waybar) ──────────────────────────────────────
 waybar
 
+# ─── Quickshell ─────────────────────────────────────────
+quickshell
+
 # ─── Quickshell runtime dependencies ───────────────────
 qt5-wayland
 qt6-wayland
 qt6-multimedia-ffmpeg
 gtk4-layer-shell
+ffmpeg
+
+# ─── File manager ──────────────────────────────────────
+dolphin
 
 # ─── Terminal ──────────────────────────────────────────
 figlet
@@ -27,12 +34,14 @@ pipewire-pulse
 wireplumber
 pavucontrol
 playerctl
+libpulse
 
 # ─── Notifications + polkit ────────────────────────────
 polkit-kde-agent
 
-# Bluetooth
-
+# ─── Bluetooth ─────────────────────────────────────────
+bluez
+bluez-utils
 kdeconnect
 
 # ─── Screenshots, brightness, clipboard ────────────────
@@ -49,6 +58,7 @@ udisks2
 
 # ─── Network ───────────────────────────────────────────
 networkmanager
+curl
 
 # ─── Fonts ─────────────────────────────────────────────
 ttf-jetbrains-mono
@@ -61,7 +71,6 @@ fish
 starship
 
 # ─── Python deps used by gen-lockbg.py / pixel-wave ────
-python-cairo
 python-numpy
 python-pillow
 python-opencv

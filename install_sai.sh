@@ -10,6 +10,7 @@ BACKUP_DIR="$HOME/.config-backup-$(date +%Y%m%d-%H%M%S)-$$"
 CONFIG_DIRS=(hypr quickshell waybar kitty dunst)
 PICTURES_DIR="${XDG_PICTURES_DIR:-$HOME/Pictures}"
 WALLPAPER_DIR="$PICTURES_DIR/wallpapers"
+SCREENSHOT_DIR="$HOME/Screenshots"
 
 for arg in "$@"; do
     case "$arg" in
@@ -70,6 +71,7 @@ copy_configs() {
         cp -a "$source_dir/." "$target_dir/"
     done
 
+
     find "$CONFIG_HOME/hypr" "$CONFIG_HOME/quickshell" "$CONFIG_HOME/waybar" \
         -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod +x {} + 2>/dev/null || true
 
@@ -81,6 +83,14 @@ copy_configs() {
     if [[ -d "$BACKUP_DIR" ]]; then
         echo "Old configs were backed up to $BACKUP_DIR"
     fi
+}
+
+apply_kde_colors() {
+    local scheme="$SCRIPT_DIR/config/kde/Unit3Gold.colors"
+    local script="$SCRIPT_DIR/scripts/apply-kde-colors.py"
+    [[ -f "$scheme" && -f "$script" ]] || return 0
+    echo "Applying Unit3 Gold KDE colour scheme..."
+    python3 "$script" "$scheme"
 }
 
 install_pam_files() {
@@ -101,6 +111,19 @@ install_pam_files() {
         echo "Installing PAM file: $target_file"
         sudo install -D -m 644 "$source_file" "$target_file"
     done
+}
+
+setup_user_dirs() {
+    # hyprland.conf writes screenshots here (Print / ALT+SHIFT+S)
+    mkdir -p "$SCREENSHOT_DIR" "$WALLPAPER_DIR"
+}
+
+enable_services() {
+    echo "Enabling services..."
+    sudo systemctl enable --now NetworkManager.service 2>/dev/null || echo "  NetworkManager: skipped."
+    sudo systemctl enable --now bluetooth.service 2>/dev/null || echo "  bluetooth: skipped."
+    systemctl --user enable --now pipewire pipewire-pulse wireplumber 2>/dev/null \
+        || echo "  pipewire: skipped (fine if started with the session)."
 }
 
 copy_wallpapers() {
@@ -157,7 +180,10 @@ elif ! $INSTALL_AUR; then
 fi
 
 copy_configs
+apply_kde_colors
+setup_user_dirs
 copy_wallpapers
 install_pam_files
+enable_services
 
-echo "Done."
+echo "Done. Log out and back into Hyprland to apply."

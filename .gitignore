@@ -1,6 +1,9 @@
 # ─── Generated at runtime ──────────────────────────────
 hypr/lockbg.png
 **/lockbg.png
+# pixel-wave videos, rebuilt on first login by quickshell/wave-check.sh
+quickshell/videos/
+**/quickshell/videos/
 
 # ─── Personal user override ────────────────────────────
 hypr/user.conf
