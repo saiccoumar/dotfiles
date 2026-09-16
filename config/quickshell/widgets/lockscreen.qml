@@ -93,28 +93,51 @@ ShellRoot {
 
             property bool isPrimary: modelData.name === Quickshell.screens[0].name
 
+            // ── Vidéos par résolution ──
+            // Chaque écran a potentiellement une résolution/ratio différent
+            // (ex: ultrawide vs CRT 4:3) : on cible d'abord la vidéo générée
+            // pour SA résolution (wave-check.sh en génère une par moniteur
+            // connecté), et on retombe sur le fichier générique si celle-ci
+            // n'existe pas encore (pas de check bloquant depuis QML, on
+            // détecte l'échec de chargement et on bascule).
+            readonly property string videoDir: root.xdgConfigHome + "/quickshell/videos/"
+            readonly property string resKey: modelData.width + "x" + modelData.height
+            property bool revealFallback: false
+            property bool hideFallback: false
+            property bool imgFallback: false
+
             // ── Fast mode background ──
             // Affiche la dernière frame de wave_reveal.mp4 comme image statique.
             // Chargement instantané (pas de FFmpeg, pas de codec vidéo).
             Image {
                 id: fastBg
                 anchors.fill: parent
-                source: root.fastMode ? ("file://" + root.xdgConfigHome + "/quickshell/videos/wave_last_frame.png") : ""
+                source: root.fastMode ? ("file://" + videoDir + "wave_last_frame" + (imgFallback ? "" : ("_" + resKey)) + ".png") : ""
                 visible: root.fastMode && !root.hiding && !root.done
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: false
                 cache: true
                 z: 0
+                onStatusChanged: {
+                    if (status === Image.Error && !imgFallback) imgFallback = true
+                }
             }
 
             // ── Reveal ──
             MediaPlayer {
                 id: reveal
-                source: root.fastMode ? "" : ("file://" + root.xdgConfigHome + "/quickshell/videos/wave_reveal.mp4")
+                source: root.fastMode ? "" : ("file://" + videoDir + "wave_reveal" + (revealFallback ? "" : ("_" + resKey)) + ".mp4")
                 videoOutput: voReveal
                 audioOutput: null
                 loops: 1
                 autoPlay: false
+                onErrorOccurred: function(error, errorString) {
+                    if (!revealFallback) {
+                        revealFallback = true
+                        reveal.position = 0
+                        reveal.play()
+                    }
+                }
                 onPositionChanged: function() {
                     if (root.hiding || root.done) return
                     var pos = reveal.position
@@ -134,11 +157,14 @@ ShellRoot {
             // ── Hide ──
             MediaPlayer {
                 id: hide
-                source: "file://" + root.xdgConfigHome + "/quickshell/videos/wave_hide.mp4"
+                source: "file://" + videoDir + "wave_hide" + (hideFallback ? "" : ("_" + resKey)) + ".mp4"
                 videoOutput: voHide
                 audioOutput: null
                 loops: 1
                 autoPlay: false
+                onErrorOccurred: function(error, errorString) {
+                    if (!hideFallback) hideFallback = true
+                }
                 onMediaStatusChanged: function() {
                     // Fermeture gérée par hideFadeAnim.onFinished
                 }

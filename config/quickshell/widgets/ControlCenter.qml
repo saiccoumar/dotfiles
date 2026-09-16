@@ -47,6 +47,7 @@ ShellRoot {
         top:    [ {key:"wifi",      label:"Wi-Fi"},
                   {key:"bluetooth", label:"Bluetooth"} ],
         bottom: [ {key:"output",    label:"Output"},
+                  {key:"input",     label:"Input"},
                   {key:"volume",    label:"Volume"} ],
         left:   [ {key:"send",      label:"Send"},
                   {key:"receive",   label:"Receive"} ],
@@ -60,6 +61,8 @@ ShellRoot {
         "top.bluetooth":    {h3:"Bluetooth",           status:"—",    on:false,
                               actions:[{key:"toggle",label:"Toggle Bluetooth"}]},
         "bottom.output":    {h3:"Audio Output",        status:"—",    on:false,
+                              actions:[{key:"placeholder",label:"Sub-menu coming"}]},
+        "bottom.input":     {h3:"Audio Input",         status:"—",    on:false,
                               actions:[{key:"placeholder",label:"Sub-menu coming"}]},
         "bottom.volume":    {h3:"Volume",              status:"—",    on:false,
                               actions:[{key:"placeholder",label:"Sub-menu coming"}]},
@@ -118,6 +121,28 @@ ShellRoot {
             }
             return acts2
         }
+        // Audio Output : un bouton par sink (haut-parleur/casque/etc.)
+        if (key === "bottom.output") {
+            var acts3 = []
+            for (var o = 0; o < audioSinks.length; o++) {
+                var snk = audioSinks[o]
+                var prefix3 = (snk.name === audioDefaultSink) ? "✓ " : "  "
+                acts3.push({key: "sink:" + snk.name, label: prefix3 + snk.description})
+            }
+            if (!acts3.length) acts3.push({key:"none", label:"No output devices found"})
+            return acts3
+        }
+        // Audio Input : un bouton par source (micro/ligne/etc.)
+        if (key === "bottom.input") {
+            var acts4 = []
+            for (var p = 0; p < audioSources.length; p++) {
+                var src = audioSources[p]
+                var prefix4 = (src.name === audioDefaultSource) ? "✓ " : "  "
+                acts4.push({key: "source:" + src.name, label: prefix4 + src.description})
+            }
+            if (!acts4.length) acts4.push({key:"none", label:"No input devices found"})
+            return acts4
+        }
         // Autres : actions statiques du dictionnaire details
         var dd = root.details[key]
         return dd ? dd.actions : []
@@ -128,6 +153,8 @@ ShellRoot {
         var key = detailKey()
         if (key === "top.wifi")      return "Wi-Fi"
         if (key === "top.bluetooth") return "Bluetooth"
+        if (key === "bottom.output") return "Audio Output"
+        if (key === "bottom.input")  return "Audio Input"
         var d = root.details[key]
         return d ? d.h3 : ""
     }
@@ -144,6 +171,14 @@ ShellRoot {
             if (connected.length) return "Connected · " + connected[0].name
             return "Enabled · " + btDevices.length + " paired"
         }
+        if (key === "bottom.output") {
+            var curSink = audioSinks.filter(function(s){return s.name === audioDefaultSink})
+            return curSink.length ? curSink[0].description : "—"
+        }
+        if (key === "bottom.input") {
+            var curSrc = audioSources.filter(function(s){return s.name === audioDefaultSource})
+            return curSrc.length ? curSrc[0].description : "—"
+        }
         var d = root.details[key]
         return d ? d.status : ""
     }
@@ -151,6 +186,8 @@ ShellRoot {
         var key = detailKey()
         if (key === "top.wifi")      return wifiEnabled
         if (key === "top.bluetooth") return btEnabled
+        if (key === "bottom.output") return audioSinks.length > 0
+        if (key === "bottom.input")  return audioSources.length > 0
         var d = root.details[key]
         return d ? d.on : false
     }
@@ -226,8 +263,13 @@ ShellRoot {
             "echo \"$(bluetoothctl show 2>/dev/null | grep -i 'powered:' | awk '{print $2}')\"; " +
             "bluetoothctl devices 2>/dev/null | while read line; do " +
             "  mac=$(echo \"$line\" | awk '{print $2}'); " +
-            "  name=$(echo \"$line\" | cut -d' ' -f3-); " +
+            "  fallback=$(echo \"$line\" | cut -d' ' -f3-); " +
             "  info=$(bluetoothctl info \"$mac\" 2>/dev/null); " +
+            "  rname=$(echo \"$info\" | grep -m1 -i '^[[:space:]]*Name:' | sed -E 's/^[[:space:]]*Name:[[:space:]]*//'); " +
+            "  alias=$(echo \"$info\" | grep -m1 -i '^[[:space:]]*Alias:' | sed -E 's/^[[:space:]]*Alias:[[:space:]]*//'); " +
+            "  if [ -n \"$rname\" ]; then name=\"$rname\"; " +
+            "  elif [ -n \"$alias\" ] && ! echo \"$alias\" | grep -qE '^[0-9A-Fa-f]{2}([-:][0-9A-Fa-f]{2}){5}$'; then name=\"$alias\"; " +
+            "  else name=\"$fallback\"; fi; " +
             "  conn=$(echo \"$info\" | grep -i 'Connected:' | awk '{print $2}'); " +
             "  paired=$(echo \"$info\" | grep -i 'Paired:' | awk '{print $2}'); " +
             "  trusted=$(echo \"$info\" | grep -i 'Trusted:' | awk '{print $2}'); " +
@@ -261,6 +303,54 @@ ShellRoot {
                     return a.name.localeCompare(b.name)
                 })
                 root.btDevices = devices
+            }
+        }
+    }
+
+    // ── Données système : Audio (sinks/sources PipeWire via pactl) ──
+    property string audioDefaultSink:   ""
+    property string audioDefaultSource: ""
+    property var    audioSinks:   []   // [{name, description}]
+    property var    audioSources: []   // [{name, description}]
+
+    Timer {
+        interval: 3000; running: root.open && root.slot === "bottom"; repeat: true; triggeredOnStart: true
+        onTriggered: pollAudio.running = true
+    }
+    Process {
+        id: pollAudio
+        // Ligne 1: default sink, ligne 2: default source, puis blocs marqués ##SINKS##/##SOURCES##
+        command: ["sh","-c",
+            "pactl get-default-sink 2>/dev/null; " +
+            "pactl get-default-source 2>/dev/null; " +
+            "echo '##SINKS##'; " +
+            "pactl -f json list sinks 2>/dev/null | jq -r '.[] | \"\\(.name)|\\(.description)\"' 2>/dev/null; " +
+            "echo '##SOURCES##'; " +
+            "pactl -f json list sources 2>/dev/null | jq -r '.[] | select(.properties[\"media.class\"]==\"Audio/Source\") | \"\\(.name)|\\(.description)\"' 2>/dev/null"
+        ]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var lines = this.text.split("\n")
+                var defSink = (lines[0] || "").trim()
+                var defSrc  = (lines[1] || "").trim()
+                var sinks = []
+                var sources = []
+                var mode = ""
+                for (var i = 2; i < lines.length; i++) {
+                    var line = lines[i]
+                    if (line === "##SINKS##")   { mode = "sinks";   continue }
+                    if (line === "##SOURCES##") { mode = "sources"; continue }
+                    if (!line) continue
+                    var parts = line.split("|")
+                    if (parts.length < 2) continue
+                    var entry = { name: parts[0], description: parts.slice(1).join("|") }
+                    if (mode === "sinks") sinks.push(entry)
+                    else if (mode === "sources") sources.push(entry)
+                }
+                root.audioDefaultSink   = defSink
+                root.audioDefaultSource = defSrc
+                root.audioSinks   = sinks
+                root.audioSources = sources
             }
         }
     }
@@ -387,6 +477,24 @@ ShellRoot {
                 cmd = "bluetoothctl disconnect " + mac4 + " 2>/dev/null; bluetoothctl remove " + mac4
             }
         }
+        // ── Audio Output ──
+        else if (slotKey === "bottom" && subKey === "output") {
+            if (actionKey.indexOf("sink:") === 0) {
+                var sinkName = actionKey.substring(5).replace(/'/g, "'\\''")
+                // Bascule le sink par défaut et déplace les flux déjà en cours vers celui-ci
+                cmd = "pactl set-default-sink '" + sinkName + "'; " +
+                      "pactl list short sink-inputs | cut -f1 | while read si; do pactl move-sink-input \"$si\" '" + sinkName + "'; done"
+            }
+        }
+        // ── Audio Input ──
+        else if (slotKey === "bottom" && subKey === "input") {
+            if (actionKey.indexOf("source:") === 0) {
+                var srcName = actionKey.substring(7).replace(/'/g, "'\\''")
+                // Bascule la source par défaut et déplace les flux déjà en cours vers celle-ci
+                cmd = "pactl set-default-source '" + srcName + "'; " +
+                      "pactl list short source-outputs | cut -f1 | while read so; do pactl move-source-output \"$so\" '" + srcName + "'; done"
+            }
+        }
 
         if (cmd) {
             actProc.command = ["sh","-c", cmd]
@@ -403,7 +511,7 @@ ShellRoot {
     Timer {
         id: refreshTimer
         interval: 800; repeat: false
-        onTriggered: { pollWifi.running = true; pollBt.running = true }
+        onTriggered: { pollWifi.running = true; pollBt.running = true; pollAudio.running = true }
     }
     // Refresh BT répété après une action pair/connect (peut prendre 5-10s)
     Timer {
@@ -638,7 +746,7 @@ ShellRoot {
                     Slot {
                         slotKey: "bottom"
                         title: "Audio"
-                        subtitle: "Output · Volume"
+                        subtitle: "Output · Input · Volume"
                         anchors.horizontalCenter: parent.horizontalCenter
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.verticalCenterOffset: (root.open && !root.closing) ? root.slotGapV : 0
@@ -981,10 +1089,10 @@ ShellRoot {
             width: 300
             height: detailsCol.implicitHeight + 36
 
-            // Box stylisée style NieR (fond beige soft + bordure + onglet)
+            // Box stylisée style NieR (fond opaque + bordure + onglet)
             Rectangle {
                 anchors.fill: parent
-                color: root.colCardSoft
+                color: root.colCard
                 border.color: root.colInk
                 border.width: 1
             }

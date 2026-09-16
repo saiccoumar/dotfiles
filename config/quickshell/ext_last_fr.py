@@ -27,10 +27,12 @@ def get_last_frame(cap):
 def extract_last_frame_from_path(video_path):
     cap = open_video_capture(video_path)
     last_frame = get_last_frame(cap)
-    config_home = os.environ.get("XDG_CONFIG_HOME")
-    base_dir = Path(config_home) if config_home else Path.home() / ".config"
-    out_path = base_dir / "quickshell" / "videos" / "wave_last_frame.png"
+    in_path = Path(video_path)
+    # Préserve un éventuel suffixe de résolution (ex: wave_reveal_2560x1440.mp4
+    # -> wave_last_frame_2560x1440.png) pour que chaque écran garde sa propre frame.
+    out_name = in_path.stem.replace("wave_reveal", "wave_last_frame") + ".png"
+    out_path = in_path.parent / out_name
     cv2.imwrite(str(out_path), last_frame)  # Save the last frame as an image
-    print(video_path)
+    print(out_path)
 
 extract_last_frame_from_path(video_path)

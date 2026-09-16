@@ -2,7 +2,8 @@
 # ═════════════════════════════════════════════════════════════════════
 # wave-check.sh
 # Vérifie au démarrage Hyprland que les vidéos de la vague de pixels
-# (reveal + hide) sont présentes. Si non, les génère en bloquant.
+# (reveal + hide) sont présentes, pour CHAQUE résolution de moniteur
+# connecté. Si non, les génère en bloquant.
 #
 # Usage :
 #   - Lancer manuellement : ./wave-check.sh
@@ -28,11 +29,6 @@ VIDEOS_DIR="$QS_DIR/videos"
 LOG_DIR="$CACHE_HOME/quickshell"
 LOG_FILE="$LOG_DIR/wave-check.log"
 
-# Fichiers attendus (noms utilisés par lockscreen.qml et WallpaperPicker.qml)
-REVEAL_VIDEO="$VIDEOS_DIR/wave_reveal.mp4"
-HIDE_VIDEO="$VIDEOS_DIR/wave_hide.mp4"
-LAST_FRAME="$VIDEOS_DIR/wave_last_frame.png"
-
 # Scripts générateurs
 REVEAL_SCRIPT="$QS_DIR/pixel_wave.py"
 HIDE_SCRIPT="$QS_DIR/pixel-wave-close-video.py"
@@ -41,12 +37,28 @@ LAST_FRAME_SCRIPT="$QS_DIR/ext_last_fr.py"
 # ── Préparation ──
 mkdir -p "$VIDEOS_DIR" "$LOG_DIR"
 
+# ── Résolutions de tous les moniteurs connectés ──
+# Un jeu de vidéos (reveal/hide/last_frame) est généré par résolution
+# distincte, pour que chaque écran (ex: ultrawide + CRT 4:3) ait sa
+# propre vidéo au bon ratio, au lieu de réutiliser celle du moniteur
+# focus au démarrage.
+RESOLUTIONS=$(hyprctl monitors -j 2>/dev/null | jq -r '.[] | "\(.width)x\(.height)"' 2>/dev/null | sort -u)
+if [[ -z "$RESOLUTIONS" ]]; then
+    RESOLUTIONS="1920x1080"
+fi
+
+FOCUSED_RES=$(hyprctl monitors -j 2>/dev/null | jq -r '(map(select(.focused)) + .)[0] | "\(.width)x\(.height)"' 2>/dev/null)
+if [[ -z "$FOCUSED_RES" || "$FOCUSED_RES" == "null" ]]; then
+    FOCUSED_RES=$(echo "$RESOLUTIONS" | head -n1)
+fi
+
 # Redirection stdout + stderr vers le log (avec timestamp)
 exec > >(while IFS= read -r line; do printf '[%s] %s\n' "$(date +%H:%M:%S)" "$line"; done >> "$LOG_FILE") 2>&1
 
 echo "═══════════════════════════════════════════════════════════"
 echo "wave-check.sh — démarrage"
 echo "  videos dir : $VIDEOS_DIR"
+echo "  résolutions détectées : $(echo "$RESOLUTIONS" | tr '\n' ' ')"
 echo "═══════════════════════════════════════════════════════════"
 
 # ── Vérification présence des scripts ──
@@ -61,46 +73,68 @@ if (( ${#missing_scripts[@]} > 0 )); then
     exit 1
 fi
 
-# ── Génération reveal ──
-if [[ -f "$REVEAL_VIDEO" ]] && [[ $FORCE -eq 0 ]]; then
-    echo "✓ wave_reveal.mp4 existe déjà"
-else
-    echo "↻ génération wave_reveal.mp4…"
-    python "$REVEAL_SCRIPT" -o "$REVEAL_VIDEO"
-    if [[ -f "$REVEAL_VIDEO" ]]; then
-        echo "✓ wave_reveal.mp4 généré"
-    else
-        echo "❌ échec génération wave_reveal.mp4"
-        exit 2
-    fi
-fi
+# ── Génération par résolution ──
+while IFS= read -r RES; do
+    [[ -z "$RES" ]] && continue
+    WAVE_W="${RES%x*}"
+    WAVE_H="${RES#*x}"
 
-# ── Génération hide ──
-if [[ -f "$HIDE_VIDEO" ]] && [[ $FORCE -eq 0 ]]; then
-    echo "✓ wave_hide.mp4 existe déjà"
-else
-    echo "↻ génération wave_hide.mp4…"
-    python "$HIDE_SCRIPT" -o "$HIDE_VIDEO"
-    if [[ -f "$HIDE_VIDEO" ]]; then
-        echo "✓ wave_hide.mp4 généré"
-    else
-        echo "❌ échec génération wave_hide.mp4"
-        exit 3
-    fi
-fi
+    REVEAL_VIDEO="$VIDEOS_DIR/wave_reveal_${RES}.mp4"
+    HIDE_VIDEO="$VIDEOS_DIR/wave_hide_${RES}.mp4"
+    LAST_FRAME="$VIDEOS_DIR/wave_last_frame_${RES}.png"
 
-# ── Génération last frame ──
-if [[ -f "$LAST_FRAME" ]] && [[ $FORCE -eq 0 ]]; then
-    echo "✓ wave_last_frame.png existe déjà"
-else
-    echo "↻ génération wave_last_frame.png…"
-    python "$LAST_FRAME_SCRIPT" "$REVEAL_VIDEO"
-    if [[ -f "$LAST_FRAME" ]]; then
-        echo "✓ wave_last_frame.png généré"
+    if [[ -f "$REVEAL_VIDEO" ]] && [[ $FORCE -eq 0 ]]; then
+        echo "✓ wave_reveal_${RES}.mp4 existe déjà"
     else
-        echo "❌ échec génération wave_last_frame.png"
-        exit 4
+        echo "↻ génération wave_reveal_${RES}.mp4… ($WAVE_W x $WAVE_H)"
+        python "$REVEAL_SCRIPT" -w "$WAVE_W" -H "$WAVE_H" -o "$REVEAL_VIDEO"
+        if [[ -f "$REVEAL_VIDEO" ]]; then
+            echo "✓ wave_reveal_${RES}.mp4 généré"
+        else
+            echo "❌ échec génération wave_reveal_${RES}.mp4"
+            exit 2
+        fi
     fi
+
+    if [[ -f "$HIDE_VIDEO" ]] && [[ $FORCE -eq 0 ]]; then
+        echo "✓ wave_hide_${RES}.mp4 existe déjà"
+    else
+        echo "↻ génération wave_hide_${RES}.mp4… ($WAVE_W x $WAVE_H)"
+        python "$HIDE_SCRIPT" -w "$WAVE_W" -H "$WAVE_H" -o "$HIDE_VIDEO"
+        if [[ -f "$HIDE_VIDEO" ]]; then
+            echo "✓ wave_hide_${RES}.mp4 généré"
+        else
+            echo "❌ échec génération wave_hide_${RES}.mp4"
+            exit 3
+        fi
+    fi
+
+    if [[ -f "$LAST_FRAME" ]] && [[ $FORCE -eq 0 ]]; then
+        echo "✓ wave_last_frame_${RES}.png existe déjà"
+    else
+        echo "↻ génération wave_last_frame_${RES}.png…"
+        python "$LAST_FRAME_SCRIPT" "$REVEAL_VIDEO"
+        if [[ -f "$LAST_FRAME" ]]; then
+            echo "✓ wave_last_frame_${RES}.png généré"
+        else
+            echo "❌ échec génération wave_last_frame_${RES}.png"
+            exit 4
+        fi
+    fi
+done <<< "$RESOLUTIONS"
+
+# ── Copie vers les noms génériques (rétrocompatibilité) ──
+# WallpaperPicker.qml (et tout autre consommateur qui ignore la résolution)
+# continue d'utiliser wave_reveal.mp4 / wave_hide.mp4 / wave_last_frame.png,
+# qui pointent vers la résolution du moniteur focus.
+if [[ $FORCE -eq 1 ]] || [[ ! -f "$VIDEOS_DIR/wave_reveal.mp4" ]]; then
+    cp -f "$VIDEOS_DIR/wave_reveal_${FOCUSED_RES}.mp4" "$VIDEOS_DIR/wave_reveal.mp4"
+fi
+if [[ $FORCE -eq 1 ]] || [[ ! -f "$VIDEOS_DIR/wave_hide.mp4" ]]; then
+    cp -f "$VIDEOS_DIR/wave_hide_${FOCUSED_RES}.mp4" "$VIDEOS_DIR/wave_hide.mp4"
+fi
+if [[ $FORCE -eq 1 ]] || [[ ! -f "$VIDEOS_DIR/wave_last_frame.png" ]]; then
+    cp -f "$VIDEOS_DIR/wave_last_frame_${FOCUSED_RES}.png" "$VIDEOS_DIR/wave_last_frame.png"
 fi
 
 echo "═══════════════════════════════════════════════════════════"
