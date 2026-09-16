@@ -15,10 +15,6 @@ ShellRoot {
     // ── CONTROLCENTER ──
     ControlCenter {}
 
-
-    // ── VOLUMEBAR ──
-    VolumeBar {}
-
     // ── WEATHER ──
     property bool   weatherVisible: false
     property bool   weatherOnTop:   false
