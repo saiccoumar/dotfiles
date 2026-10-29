@@ -12,20 +12,30 @@ def get_monitors():
 
 def main():
     if len(sys.argv) < 3:
-        print("Usage: workspace_manager.py <workspace_index> <action: switch|move>")
+        print("Usage: workspace_manager.py <workspace_index|next|prev> <action: switch|move>")
         sys.exit(1)
 
     ws_idx = sys.argv[1]
     action = sys.argv[2]
 
-    try:
-        ws_num = int(ws_idx)
-    except ValueError:
-        sys.exit(1)
-
     monitors = get_monitors()
     if not monitors:
         sys.exit(1)
+
+    if ws_idx in ('next', 'prev'):
+        # Step by the number of monitors so we stay on the focused monitor's
+        # workspaces (odd on primary, even on secondary)
+        step = 2 if len(monitors) > 1 else 1
+        focused = next((m for m in monitors if m.get('focused')), monitors[0])
+        current = focused['activeWorkspace']['id']
+        ws_num = current + step if ws_idx == 'next' else current - step
+        if ws_num < 1:
+            sys.exit(0)
+    else:
+        try:
+            ws_num = int(ws_idx)
+        except ValueError:
+            sys.exit(1)
 
     # First monitor is primary
     primary = monitors[0]['name']
