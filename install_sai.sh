@@ -75,9 +75,21 @@ copy_configs() {
     find "$CONFIG_HOME/hypr" "$CONFIG_HOME/quickshell" "$CONFIG_HOME/waybar" \
         -type f \( -name '*.sh' -o -name '*.py' \) -exec chmod +x {} + 2>/dev/null || true
 
-    if [[ ! -f "$CONFIG_HOME/hypr/user.conf" ]]; then
+    # Hyprland now uses hyprland.lua; a leftover hyprland.conf is ignored, so
+    # remove it (it was already backed up above).
+    rm -f "$CONFIG_HOME/hypr/hyprland.conf"
+
+    if [[ -s "$CONFIG_HOME/hypr/user.conf" ]]; then
+        echo "WARNING: $CONFIG_HOME/hypr/user.conf is no longer loaded."
+        echo "         Port its contents to $CONFIG_HOME/hypr/user.lua."
+    elif [[ -f "$CONFIG_HOME/hypr/user.conf" ]]; then
+        rm -f "$CONFIG_HOME/hypr/user.conf"
+    fi
+
+    if [[ ! -f "$CONFIG_HOME/hypr/user.lua" ]]; then
         echo "Creating empty Hyprland user override file..."
-        touch "$CONFIG_HOME/hypr/user.conf"
+        printf -- '-- Personal Hyprland overrides (Lua). Never overwritten by install_sai.sh.\n' \
+            > "$CONFIG_HOME/hypr/user.lua"
     fi
 
     if [[ -d "$BACKUP_DIR" ]]; then
@@ -114,7 +126,7 @@ install_pam_files() {
 }
 
 setup_user_dirs() {
-    # hyprland.conf writes screenshots here (Print / ALT+SHIFT+S)
+    # hyprland.lua writes screenshots here (Print / ALT+SHIFT+S)
     mkdir -p "$SCREENSHOT_DIR" "$WALLPAPER_DIR"
 }
 

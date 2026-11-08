@@ -55,14 +55,19 @@ def main():
     else:
         target = primary
 
+    # Hyprland's Lua config mode: `hyprctl dispatch` takes a Lua dispatcher.
+    def dispatch(lua, quiet=False):
+        out = subprocess.DEVNULL if quiet else None
+        subprocess.run(['hyprctl', 'dispatch', lua], stdout=out, stderr=out)
+
     # 1. Force the workspace to the correct monitor
-    subprocess.run(['hyprctl', 'dispatch', 'moveworkspacetomonitor', f'{ws_num} {target}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    dispatch(f'hl.dsp.workspace.move({{ workspace = {ws_num}, monitor = {json.dumps(target)} }})', quiet=True)
 
     # 2. Perform action
     if action == "move":
-        subprocess.run(['hyprctl', 'dispatch', 'movetoworkspace', str(ws_num)])
+        dispatch(f'hl.dsp.window.move({{ workspace = {ws_num} }})')
     else:
-        subprocess.run(['hyprctl', 'dispatch', 'workspace', str(ws_num)])
+        dispatch(f'hl.dsp.focus({{ workspace = {ws_num} }})')
 
 if __name__ == '__main__':
     main()

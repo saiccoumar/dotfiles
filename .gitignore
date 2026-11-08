@@ -6,8 +6,8 @@ quickshell/videos/
 **/quickshell/videos/
 
 # ─── Personal user override ────────────────────────────
-hypr/user.conf
-**/user.conf
+hypr/user.lua
+**/user.lua
 
 # ─── Caches & logs ─────────────────────────────────────
 **/cache/
@@ -34,3 +34,4 @@ Thumbs.db
 # ─── Local dev junk ────────────────────────────────────
 *.local.sh
 TODO.local.md
+__pycache__/

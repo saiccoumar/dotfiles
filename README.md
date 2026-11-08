@@ -21,7 +21,7 @@ chmod +x install_sai.sh
 
 ## Customization
 
-Personal overrides go in `~/.config/hypr/user.conf` — this file is **never** overwritten by updates.
+Personal overrides go in `~/.config/hypr/user.lua` — this file is **never** overwritten by updates.
 
 Example:
 monitor = DP-1, 2560x1440@144, 0x0, 1

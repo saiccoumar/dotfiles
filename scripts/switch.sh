@@ -14,7 +14,7 @@ if [ -n "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
     echo "Hyprland is active -> switching to KDE Plasma on next login."
     mkdir -p "$(dirname "$FLAG_FILE")"
     echo "plasma" >"$FLAG_FILE"
-    exec hyprctl dispatch exit
+    exec hyprctl dispatch 'hl.dsp.exit()'
 
 elif [ "${XDG_CURRENT_DESKTOP:-}" = "KDE" ] || pgrep -x plasmashell >/dev/null 2>&1; then
     echo "KDE Plasma is active -> switching to Hyprland on next login."
