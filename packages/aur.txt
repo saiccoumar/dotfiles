@@ -9,3 +9,17 @@ spotify
 
 # Editor — SUPER+C
 visual-studio-code-bin
+
+# Browser
+brave-bin
+
+# Communication
+slack-desktop
+zoom
+
+# Proton version manager for Steam
+protonplus
+
+# Misc
+shellgame
+shelly

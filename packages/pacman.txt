@@ -78,3 +78,51 @@ python-opencv
 # ─── XDG ───────────────────────────────────────────────
 xdg-user-dirs
 xdg-utils
+
+# ─── Polkit agent (Hyprland) ───────────────────────────
+hyprpolkitagent
+
+# ─── CLI tools ─────────────────────────────────────────
+git
+openssh
+wget
+unzip
+unrar
+ripgrep
+btop
+nvtop
+glances
+fastfetch
+duf
+pv
+micro
+vim
+
+# ─── Extra fonts ───────────────────────────────────────
+ttf-meslo-nerd
+
+# ─── Desktop applications ──────────────────────────────
+alacritty
+firefox
+discord
+obsidian
+keepassxc
+libreoffice-fresh
+kate
+kcalc
+ark
+filelight
+gwenview
+spectacle
+meld
+haruna
+ffmpegthumbnailer
+obs-studio
+blender
+ngspice
+remmina
+virt-viewer
+tailscale
+
+# ─── Gaming (requires [multilib] enabled) ──────────────
+steam
